@@ -113,3 +113,6 @@ class TestClassification:
         print("confusion matrix")
         print(df_confusion_matrix)
 
+if __name__ == "__main__":
+    tc = TestClassification()
+    tc.test_fit()
