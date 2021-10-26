@@ -1,12 +1,10 @@
 # clustermil
-clustering based multiple instance learning
-
-# clustermil
 
 [![Build Status](https://app.travis-ci.com/inoueakimitsu/clustermil.svg?branch=main)](https://app.travis-ci.com/inoueakimitsu/clustermil)
 <a href="https://github.com/inoueakimitsu/clustermil/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues/inoueakimitsu/clustermil"></a> 
 
 Python package for multiple instance learning (MIL) for large n_instance dataset.
+
 ## Features
 
 - support count-based multiple instance assumptions (see [wikipedia](https://en.wikipedia.org/wiki/Multiple_instance_learning#:~:text=Presence-%2C%20threshold-%2C%20and%20count-based%20assumptions%5Bedit%5D))
