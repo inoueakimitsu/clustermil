@@ -7,7 +7,7 @@ name = "pypi"
 numpy = "*"
 pandas = "*"
 scikit-learn = "*"
-torch = "*"
+pulp = "*"
 
 [dev-packages]
 "flake8" = "*"
