@@ -102,14 +102,13 @@ class TestClassification:
             bags,
             lower_threshold,
             upper_threshold,
-            n_clusters,
-            n_epoch = 100,
-            lr = 0.1,
-            l1_penalty_coef = 1000,
-            n_init = 10)
+            n_clusters)
 
         df_confusion_matrix = pd.crosstab(np.hstack(true_y), milclassifier.predict(np.vstack(bags)))
         
         print("confusion matrix")
         print(df_confusion_matrix)
 
+if __name__ == "__main__":
+    tc = TestClassification()
+    tc.test_fit()

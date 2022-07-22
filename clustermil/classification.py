@@ -1,9 +1,10 @@
+from time import time
 from typing import List
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.base import ClusterMixin, BaseEstimator, BaseEstimator, ClassifierMixin
-import torch
+import pulp
 
 class ClusterMilClassifier(BaseEstimator, ClassifierMixin):
     def __init__(self, clustering: ClusterMixin, weight_list: np.ndarray, onehot_encoder: OneHotEncoder):
@@ -32,27 +33,6 @@ class ClusterMilClassifier(BaseEstimator, ClassifierMixin):
         pred_y = np.argmax(estimated_class_scores_sum, axis=1)
         return pred_y
 
-def n_mis_predict_instance_per_bag(
-        W, upper_threshold,
-        lower_threshold,
-        bag_cluster_table,
-        l1_penalty_coef: float=1000):
-    
-    n_instance_under_threshold = torch.sum(
-        (-1) * torch.minimum(
-            lower_threshold - torch.matmul(bag_cluster_table, W),
-            torch.zeros_like(lower_threshold)))
-
-    n_instance_over_threshold = torch.sum(
-        (-1) * torch.maximum(
-            torch.matmul(bag_cluster_table, W) - upper_threshold,
-            torch.zeros_like(upper_threshold)))
-    
-    n_bags = bag_cluster_table.shape[0]
-
-    l1_penalty_term = torch.mean(torch.abs(W)) * l1_penalty_coef
-
-    return (n_instance_under_threshold + n_instance_over_threshold) / n_bags + l1_penalty_term
 
 def generate_mil_classifier(
         clustering: ClusterMixin,
@@ -61,10 +41,6 @@ def generate_mil_classifier(
         lower_threshold: np.ndarray,
         upper_threshold: np.ndarray,
         n_clusters: int,
-        n_epoch: int = 100,
-        lr: int = 0.1,
-        l1_penalty_coef: float = 1000,
-        n_init: int = 100,
         debug: bool = False):
     
     one_hot_encoded = [
@@ -76,39 +52,40 @@ def generate_mil_classifier(
     
     n_classes = lower_threshold.shape[1]
 
-    # cast to torch tensor
-    upper_threshold = torch.as_tensor(upper_threshold)
-    lower_threshold = torch.as_tensor(lower_threshold)
-    bag_cluster_table = torch.as_tensor(bag_cluster_table)
+    problem = pulp.LpProblem("clustermil", pulp.LpMinimize)
+    margin = pulp.LpVariable("margin", lowBound=0)
+    problem += margin
 
-    estimated_W_list = []
-    losses_list = []
-
-    for i_init in range(n_init):
-        print(i_init, "th init")
-
-        W = torch.rand((n_clusters, n_classes), dtype=torch.float64, requires_grad=True)
-
-        losses = []
-
-        for i_epoch in range(n_epoch):
-        
-            loss = n_mis_predict_instance_per_bag(W, upper_threshold, lower_threshold, bag_cluster_table, l1_penalty_coef=l1_penalty_coef)
-            loss.backward()
-
-            with torch.no_grad():
-                W -= lr * W.grad
-                W.grad.zero_()
-                W.data = torch.maximum(W.data, torch.zeros_like(W.data)).data
-                eps = 1e-6
-                W.data = W.data / (torch.sum(W.data, dim=0, keepdim=True)+eps)
-                W.data = W.data / (torch.sum(W.data, dim=1, keepdim=True)+eps)
+    W = []
+    for i_class in range(n_classes):
+        w = []
+        for i_cluster in range(n_clusters):
+            w.append(pulp.LpVariable(
+                f"w_{i_class}_{i_cluster}", cat=pulp.LpBinary))
+        W.append(w)
+    for i_cluster in range(n_clusters):
+        problem += pulp.lpSum(W[i_class][i_cluster] for i_class in range(n_classes)) == 1
+    
+    for i_bag in range(len(bags)):
+        for i_class in range(n_classes):
+            sum = None
+            for i_cluster in range(n_clusters):
+                if sum is None:
+                    sum = W[i_class][i_cluster] * bag_cluster_table[i_bag][i_cluster]
+                else:
+                    sum += W[i_class][i_cluster] * bag_cluster_table[i_bag][i_cluster]
             
-            losses.append(loss.item())
+            problem += sum - margin <= upper_threshold[i_bag][i_class]
+            problem += sum + margin >= lower_threshold[i_bag][i_class]
+    
+    
+    problem.solve()
+    W_float = np.array([np.array([x.value() for x in w]) for w in W]).T
+    estimated_W_list = [W_float]
 
-        # record this configuration
-        estimated_W_list.append(W.detach().numpy())
-        losses_list.append(losses)
+    if debug:
+        print(f"W_float: {W_float}")
+        print(f"margin: {margin.value()}")
 
     return ClusterMilClassifier(clustering, estimated_W_list, cluster_encoder)
 
