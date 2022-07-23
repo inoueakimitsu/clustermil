@@ -25,7 +25,7 @@ setup(
     packages=['clustermil'],
     include_package_data=True,
     python_requires=">=3.7.*",
-    install_requires=['numpy', 'pandas', 'scikit-learn', 'torch'],
+    install_requires=['numpy', 'pandas', 'scikit-learn', 'pulp'],
     license=about['__license__'],
     zip_safe=False,
     classifiers=[
